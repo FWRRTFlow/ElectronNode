@@ -8,13 +8,13 @@ class Sensor
 public:
 	Sensor(String name, String units)
 	{
-		name_ = new char [name.length()+1]; // Make space for the name
-		name.toCharArray(name_, name.length()); // Copy name to memory
-		name_[name.length()] = 0; // Add in Null Terminator
+		name_ = new char [name.length()+2]; // Make space for the name
+		name.toCharArray(name_, name.length()+1); // Copy name to memory
+		name_[name.length()+1] = 0; // Add in Null Terminator
 
-		units_ = new char [units.length()+1]; // Make space for the name
-		units.toCharArray(units_, units.length()); // Copy name to memory
-		units_[units.length()] = 0; // Add in Null Terminator
+		units_ = new char [units.length()+2]; // Make space for the name
+		units.toCharArray(units_, units.length()+1); // Copy name to memory
+		units_[units.length()+1] = 0; // Add in Null Terminator
 	};
 
 	~Sensor()

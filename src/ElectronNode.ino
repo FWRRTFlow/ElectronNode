@@ -47,6 +47,8 @@ const int PERIPHERAL_ENABLE_PIN = B0;
 const int MAXBOTIX_INPUT_PIN = A0;
 
 const float RUN_INTERVAL_min = 15.0;
+//const float MAX_ON_TIME_min = 2.0;
+
 
 const OutputLevel NODE_OUTPUT_LEVEL = OutputLevel::NoLCD;
 
@@ -93,7 +95,7 @@ void setup()
 	sensors.push_back(workingConfig);
 
 	// General BMP280 Setup
-	envSensorInternal.begin(0x77);
+	envSensorInternal.begin(0x76);
 
 	// Internal Temperature
 	BMP280TempSensor *internalTemp = new BMP280TempSensor("tempInternal", &envSensorInternal);
@@ -125,12 +127,15 @@ void loop()
 
 	ProcessAllSensors(NODE_OUTPUT_LEVEL);
 
+	Serial.println(fuelGauge.getSoC());
+
 	DisableSensors();
 	delay(1000);
 
 	//    The program restarts after each sleep, so subtract the time it takes
     // to run from the next sleep cycle.  Note that is cannot be used without sleep.
-    System.sleep(SLEEP_MODE_DEEP, RUN_INTERVAL_min*60-(millis()/1000));
+    //System.sleep(SLEEP_MODE_DEEP, RUN_INTERVAL_min*60-(millis()/1000));
+	delay(30000);
 }
 
 void ProcessAllSensors(OutputLevel outputLevel)
@@ -139,7 +144,9 @@ void ProcessAllSensors(OutputLevel outputLevel)
 	{
 		SensorConfig sc = sensors.at(i);
 		Sensor* s = sc.SensorPtr;
+		time_t startTime = Time.now();
 		float sensorOutput = s->GetTrialAverage(sc.NumSamples, sc.SamplePeriod_ms);
+		time_t midSampleTime = GetMidTimeStamp(startTime, Time.now());
 
 		if (SerialOnly == outputLevel || LocalOnly == outputLevel || AllOutputs == outputLevel || NoLCD == outputLevel)
 		{
@@ -159,12 +166,17 @@ void ProcessAllSensors(OutputLevel outputLevel)
 
 		if (Publish == outputLevel || AllOutputs == outputLevel || NoLCD == outputLevel)
 		{
-			PackageAndPublish(s->GetName(), sensorOutput, 0);
+			PackageAndPublish(s->GetName(), sensorOutput, midSampleTime);
 		}
 	}
 }
 
-bool PackageAndPublish(String topic, float value, unsigned long timestamp)
+time_t GetMidTimeStamp(time_t startTime, time_t stopTime)
+{
+	return startTime + (stopTime-startTime)/2;
+}
+
+bool PackageAndPublish(String topic, float value, time_t timestamp)
 {
 	String message = String(value);
 	Particle.publish(topic, message, PRIVATE);
