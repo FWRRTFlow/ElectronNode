@@ -18,6 +18,13 @@ struct SensorConfig
 	int SamplePeriod_ms;
 };
 
+struct SensorData
+{
+	String Name;
+	float Value;
+	time_t Timestamp;
+};
+
 enum OutputLevel
 {
 	NoOutput,
@@ -33,12 +40,12 @@ SYSTEM_MODE(AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 STARTUP(cellular_credentials_set("RESELLER", "", "", NULL)); // Needed for AT&T Network
 
-FuelGauge fuelGauge;
-
 std::vector<SensorConfig> sensors;
 
-Adafruit_BMP280 envSensorInternal;
+std::vector<SensorData> sensorBuffer; // put into retained memory?
 
+FuelGauge fuelGauge;
+Adafruit_BMP280 envSensorInternal;
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 
@@ -47,13 +54,17 @@ const int PERIPHERAL_ENABLE_PIN = B0;
 const int MAXBOTIX_INPUT_PIN = A0;
 
 const float RUN_INTERVAL_min = 15.0;
-//const float MAX_ON_TIME_min = 2.0;
+const float MAX_ON_TIME_min = 2.0; // unused currently
 
 
 const OutputLevel NODE_OUTPUT_LEVEL = OutputLevel::NoLCD;
+//const OutputLevel NODE_OUTPUT_LEVEL = OutputLevel::SerialOnly;
 
-
-void ProcessAllSensors(OutputLevel outputLevel);
+void ProcessAllSensors();
+time_t GetMidTimeStamp(time_t startTime, time_t stopTime);
+bool PublishData(const SensorData sensorData, OutputLevel outputLevel);
+bool PublishBuffer(OutputLevel outputLevel);
+bool PackageAndPublish(const SensorData sensorData);
 bool PackageAndPublish(String topic, float value, unsigned long timestamp);
 void EnableSensors();
 void DisableSensors();
@@ -122,10 +133,12 @@ void setup()
 // Main program execution.  Note that, if this completes, it will shut down and restart at setup(). It will not loop.
 void loop()
 {
+	unsigned long startTime = millis();
 	EnableSensors();
 	delay(1000);
 
-	ProcessAllSensors(NODE_OUTPUT_LEVEL);
+	ProcessAllSensors();
+	PublishBuffer(NODE_OUTPUT_LEVEL);
 
 	Serial.println(fuelGauge.getSoC());
 
@@ -133,12 +146,12 @@ void loop()
 	delay(1000);
 
 	//    The program restarts after each sleep, so subtract the time it takes
-    // to run from the next sleep cycle.  Note that is cannot be used without sleep.
+    // to run from the next sleep cycle.  Note that this cannot be used without sleep.
     //System.sleep(SLEEP_MODE_DEEP, RUN_INTERVAL_min*60-(millis()/1000));
-	delay(30000);
+	delay(30000-(millis() - startTime));
 }
 
-void ProcessAllSensors(OutputLevel outputLevel)
+void ProcessAllSensors()
 {
 	for (int i = 0; i < sensors.size(); ++i)
 	{
@@ -148,26 +161,8 @@ void ProcessAllSensors(OutputLevel outputLevel)
 		float sensorOutput = s->GetTrialAverage(sc.NumSamples, sc.SamplePeriod_ms);
 		time_t midSampleTime = GetMidTimeStamp(startTime, Time.now());
 
-		if (SerialOnly == outputLevel || LocalOnly == outputLevel || AllOutputs == outputLevel || NoLCD == outputLevel)
-		{
-			Serial.print(s->GetName() + ": ");
-			Serial.print(sensorOutput);
-			Serial.println(" " + s->GetUnits());
-		}
-
-		if (LCD_Only == outputLevel || LocalOnly == outputLevel || AllOutputs == outputLevel)
-		{
-			lcd.clear();
-			lcd.setCursor(0,0);
-			lcd.print(s->GetName() + ": ");
-			lcd.print(sensorOutput);
-			lcd.print(" "+s->GetUnits());
-		}
-
-		if (Publish == outputLevel || AllOutputs == outputLevel || NoLCD == outputLevel)
-		{
-			PackageAndPublish(s->GetName(), sensorOutput, midSampleTime);
-		}
+		SensorData newData = {s->GetName(),sensorOutput,midSampleTime};
+		sensorBuffer.push_back(newData);
 	}
 }
 
@@ -176,10 +171,56 @@ time_t GetMidTimeStamp(time_t startTime, time_t stopTime)
 	return startTime + (stopTime-startTime)/2;
 }
 
+// Publish all data in the buffer if possible
+bool PublishBuffer(OutputLevel outputLevel)
+{
+	bool success = true;
+	// Prioritize newer data in the buffer by sending it in reverse order
+	for (int i = sensorBuffer.size() - 1; i >= 0 ; --i)
+	{
+		success &= PublishData(sensorBuffer.at(i), outputLevel);
+		if (success) // If this element sent successfully, remove it from the buffer
+			sensorBuffer.erase(sensorBuffer.begin()+i);
+	}
+	return success;
+}
+
+bool PublishData(const SensorData sensorData, OutputLevel outputLevel)
+{
+	bool success = true;
+	if (SerialOnly == outputLevel || LocalOnly == outputLevel || AllOutputs == outputLevel || NoLCD == outputLevel)
+	{
+		Serial.print(sensorData.Name + ": ");
+		Serial.print(sensorData.Value);
+		Serial.println("  "+Time.format(sensorData.Timestamp,TIME_FORMAT_ISO8601_FULL));
+	}
+
+	if (LCD_Only == outputLevel || LocalOnly == outputLevel || AllOutputs == outputLevel)
+	{
+		lcd.clear();
+		lcd.setCursor(0,0);
+		lcd.print(sensorData.Name + ": ");
+		lcd.print(sensorData.Value);
+	}
+
+	if (Publish == outputLevel || AllOutputs == outputLevel || NoLCD == outputLevel)
+	{
+		success &= PackageAndPublish(sensorData);
+	}
+
+	return success;
+}
+
+bool PackageAndPublish(const SensorData sensorData)
+{
+	return PackageAndPublish(sensorData.Name, sensorData.Value, sensorData.Timestamp);
+}
+
 bool PackageAndPublish(String topic, float value, time_t timestamp)
 {
-	String message = String(value);
-	Particle.publish(topic, message, PRIVATE);
+	String stamp = Time.format(timestamp);//,TIME_FORMAT_ISO8601_FULL);
+	String message = String::format("{\"val\":%f, \"time:\""+stamp+"}", value);
+	return Particle.publish(topic, message, PRIVATE);
 }
 
 void EnableSensors()
