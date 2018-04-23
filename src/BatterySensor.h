@@ -9,10 +9,9 @@ class BatterySensor
 {
 public:
 	BatterySensor(String name, FuelGauge *sensor):
-		Sensor(name, String("%"))
-	{
-		sensor_ = sensor;
-	}
+		Sensor(name, String("%")),
+		sensor_(sensor)
+	{}
 
 	float GetSample()
 	{
