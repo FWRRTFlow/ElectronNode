@@ -13,8 +13,7 @@
 #include "CommonDataTypes.h"
 #include "RetainedBufferSimpler.h"
 
-//SYSTEM_MODE(AUTOMATIC);
-SYSTEM_MODE(MANUAL);
+SYSTEM_MODE(AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 STARTUP(cellular_credentials_set("RESELLER", "", "", NULL)); // Needed for AT&T Network
 
@@ -33,10 +32,9 @@ const int MAXBOTIX_INPUT_PIN = A0;
 
 const float RUN_INTERVAL_min = 15.0;
 const float MAX_ON_TIME_min = .35; // The node will attempt to limit run time to this value
+const float MAINTENANCE_DURATION_min = 30.0; // Unused; Leave the node on for this long once a day for firmware updates
 
-
-//const OutputLevel NODE_OUTPUT_LEVEL = OutputLevel::NoLCD;
-const OutputLevel NODE_OUTPUT_LEVEL = OutputLevel::SerialOnly;
+const OutputLevel NODE_OUTPUT_LEVEL = OutputLevel::NoLCD;
 
 void ProcessAllSensors();
 time_t GetMidTimeStamp(time_t startTime, time_t stopTime);
@@ -148,7 +146,6 @@ void loop()
 			sensorBuffer.clear(); // If all data is successfully backed up, clear the RAM buffer
 
 	Serial.print("RetainedBufferEntries:");Serial.println(Buffering::RetainedBufferEntries);
-	Serial.print("Size of Each Entry");Serial.println(Buffering::ENTRY_SIZE);
 	Serial.println();
 
 	//    The program restarts after each sleep, so subtract the time it takes

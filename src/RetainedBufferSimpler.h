@@ -12,7 +12,7 @@ namespace Buffering
     struct RetainedData
     {
     	char Id;
-    	char Value[6];
+    	uint16_t Value;
     	time_t Timestamp;
     };
 
@@ -46,8 +46,7 @@ namespace Buffering
         RetainedData dataEntry;
 
         dataEntry.Id = NameToId(sensorData.Name);
-        // "%05.1f" = 0-padded, 5 chars long, 1 decimal place, float
-        snprintf(dataEntry.Value,6,"%05.1f\0", sensorData.Value);
+        dataEntry.Value = sensorData.Value*100; // Data will be truncated
         dataEntry.Timestamp = sensorData.Timestamp;
 
         return dataEntry;
@@ -58,7 +57,7 @@ namespace Buffering
         SensorData sensorData;
 
         sensorData.Name = IdToName(retainedData.Id);
-        sensorData.Value = atof(retainedData.Value);
+        sensorData.Value = retainedData.Value/100.0f;
         sensorData.Timestamp = retainedData.Timestamp;
 
         return sensorData;
