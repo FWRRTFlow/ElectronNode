@@ -13,36 +13,26 @@ public:
 	{
 		if (echoPin == trigPin)
 		{
-			sensor = new UltrasonicSensor(UltrasonicSensor::ThreePin, echoPin);
+			sensor_ = new UltrasonicSensor(UltrasonicSensor::ThreePin, echoPin);
 		}
 		else
 		{
-			sensor = new UltrasonicSensor(UltrasonicSensor::FourPin, echoPin, trigPin);
+			sensor_ = new UltrasonicSensor(UltrasonicSensor::FourPin, echoPin, trigPin);
 		}
 	}
 
 	~PulseWidthUltrasonicSensor()
 	{
-		delete sensor;
+		delete sensor_;
 	}
 
 	float GetSample()
 	{
-		return sensor->GetDistance_cm();
-	}
-
-	void Enable()
-	{
-		sensor->Enable();
-	}
-
-	void Disable()
-	{
-		sensor->Disable();
+		return sensor_->GetDistance_cm();
 	}
 
 private:
-	UltrasonicSensor *sensor;
+	UltrasonicSensor *sensor_;
 };
 
 #endif // _PULSE_WIDTH_ULTRASONIC_SENSOR_H_

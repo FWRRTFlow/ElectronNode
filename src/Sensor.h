@@ -28,6 +28,7 @@ public:
 		return (enabled_) ? 0 : -1;
 	}
 
+	// Run a number of trials and average the results
 	virtual float GetTrialAverage(const int numSamples, const int samplePeriod_ms, const bool trimOutliers = true)
 	{
 		if (enabled_)
